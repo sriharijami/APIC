@@ -1,0 +1,50 @@
+openapi: 3.0.1
+info:
+  title: Orchestration Header to Body Example
+  x-ibm-name: orchestration-header-to-body-example
+  version: 1.0.0
+servers:
+  - url: /orchestrate
+paths:
+  /process:
+    post:
+      summary: Orchestrate two backends
+      operationId: orchestrateFlow
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                input:
+                  type: string
+      responses:
+        '200':
+          description: Success
+x-ibm-configuration:
+  gateway: datapower-api-gateway
+  type: rest
+  phase: realized
+  enforced: true
+  assembly:
+    execute:
+      - invoke:
+          title: Call Backend 1
+          target-url: https://backend1.example.com/getToken
+          verb: GET
+          timeout: 60
+      - set-variable:
+          title: Map Header to Body
+          actions:
+            - set: request.body.token
+              value: message.headers.x-auth-token
+      - invoke:
+          title: Call Backend 2
+          target-url: https://backend2.example.com/process
+          verb: POST
+          timeout: 60
+  properties: {}
+  testable: true
+  cors:
+    enabled: true
