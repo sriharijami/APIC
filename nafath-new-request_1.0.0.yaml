@@ -1,0 +1,247 @@
+openapi: 3.0.0
+info:
+  version: 1.0.0
+  title: Nafath New Request
+  x-ibm-name: nafath-new-request
+servers:
+  - url: /nafath
+x-ibm-configuration:
+  properties: {}
+  cors:
+    enabled: true
+  gateway: datapower-api-gateway
+  type: rest
+  phase: realized
+  enforced: true
+  testable: true
+  assembly:
+    execute:
+      - set-variable:
+          version: 2.0.0
+          title: set-variable
+          actions:
+            - set: message.body.nation id
+              value: ''
+              type: any
+      - invoke:
+          version: 2.0.0
+          title: Nafath
+          backend-type: detect
+          header-control:
+            type: blocklist
+            values: []
+          parameter-control:
+            type: allowlist
+            values: []
+          timeout: 60
+          verb: keep
+          chunked-uploads: true
+          persistent-connection: true
+          target-url: >-
+            $(nafath-host)/api/v1/mfa/request?local=$(request.parameters.local)&requestId=$(request.parameters.requestId)
+          follow-redirects: false
+          inject-proxy-headers: true
+          stop-on-error:
+            - ConnectionError
+      - map:
+          inputs:
+            input:
+              schema:
+                $ref: '#/components/schemas/RequestIDRequest'
+              variable: request.body
+              content: application/json
+          outputs:
+            output:
+              schema:
+                $ref: '#/components/schemas/RequestIDResponse'
+              variable: message.body
+              content: application/xml
+          actions:
+            - set: output.transId
+              from: input.nationalId
+            - set: output.random
+              from: input.service
+          version: 2.1.0
+          title: map
+          options:
+            mapEmulateV4EmptyJSONObject: false
+            mapEmulateV4DefaultRequiredProps: false
+            mapEnablePostProcessingJSON: false
+            mapReferenceLimit: 1
+    catch:
+      - errors:
+          - BadRequestError
+        execute:
+          - set-variable:
+              version: 2.0.0
+              title: set-variable
+              actions:
+                - set: message.headers.content-type
+                  value: application/json
+                  type: string
+                - set: message.status.code
+                  value: '400'
+                  type: string
+                - set: message.body
+                  value: '{ "errorMessage": "Bad Request"}'
+                  type: string
+      - default:
+          - set-variable:
+              version: 2.0.0
+              title: set-variable
+              actions:
+                - set: message.headers.content-type
+                  value: application/json
+                  type: string
+                - set: message.status.code
+                  value: '500'
+                  type: string
+                - set: message.body
+                  value: '{ "errorMessage": "Internal Server Error"}'
+                  type: string
+  activity-log:
+    enabled: true
+    success-content: payload
+    error-content: payload
+  catalogs:
+    Partner API:
+      properties: {}
+  buffering: true
+paths:
+  /new-request:
+    post:
+      summary: Request Digital Services Enrollment
+      operationId: New-request
+      parameters:
+        - name: local
+          in: query
+          description: en
+          required: true
+          schema:
+            type: string
+        - name: requestId
+          in: query
+          description: 34333c25-9b98-4afe-b766-23331e2037a3
+          required: true
+          schema:
+            type: string
+        - name: app-id
+          in: header
+          required: true
+          schema:
+            type: string
+            example: 32aa1bd7
+        - name: app-key
+          in: header
+          required: true
+          schema:
+            type: string
+            example: 8910b6eea7ade18defb06ab146ec92
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestIDRequest'
+      responses:
+        '200':
+          description: Successful enrollment request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RequestIDResponse'
+        '401':
+          description: Unauthorized - Invalid client id or secret
+          content:
+            application/json: {}
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    RequestIDRequest:
+      type: object
+      properties:
+        nationalId:
+          type: string
+          example: '2286535956'
+          dims: 0
+          dimensionality: []
+        service:
+          type: string
+          example: RequestDigitalServicesEnrollment
+          dims: 0
+          dimensionality: []
+      required:
+        - nationalId
+        - service
+      dims: 0
+      dimensionality: []
+    RequestIDResponse:
+      type: object
+      properties:
+        transId:
+          type: string
+          format: uuid
+          example: dadb43b3-86a0-49a3-b914-2b03784bd40c
+          dims: 0
+          dimensionality: []
+        random:
+          type: string
+          example: '75'
+          dims: 0
+          dimensionality: []
+      required:
+        - transId
+        - random
+      dims: 0
+      dimensionality: []
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              example: '400'
+            timestamp:
+              type: string
+              example: '2025-04-09T10:00:00Z'
+            request_id:
+              type: string
+              example: abcd-1234-efgh-5678
+            message:
+              type: string
+              example: Bad request
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  issue:
+                    type: string
+                example:
+                  - field: email
+                    issue: The email address is not valid
+                  - field: password
+                    issue: The password must be at least 8 characters long
+  securitySchemes:
+    clientID:
+      type: apiKey
+      in: header
+      name: X-IBM-Client-Id
+      x-key-type: client_id
+    Client-Secret:
+      type: apiKey
+      x-key-type: client_secret
+      name: X-IBM-Client-Secret
+      in: header
+security:
+  - Client-Secret: []
+    clientID: []
